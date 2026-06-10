@@ -1,58 +1,36 @@
 FROM --platform=linux/amd64 ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=UTC
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    openssh-server \
-    sudo \
-    curl \
-    wget \
-    git \
-    software-properties-common \
-    xfce4 \
-    xfce4-goodies \
+RUN apt update -y && apt install --no-install-recommends -y \
+    xfce4 xfce4-goodies \
     tigervnc-standalone-server \
-    novnc \
-    websockify \
+    novnc websockify \
+    sudo xterm \
+    systemd snapd \
+    vim net-tools curl wget git tzdata \
+    dbus-x11 x11-utils x11-xserver-utils x11-apps \
+    software-properties-common
+
+RUN add-apt-repository ppa:mozillateam/ppa -y
+
+RUN echo 'Package: *' >> /etc/apt/preferences.d/mozilla-firefox && \
+    echo 'Pin: release o=LP-PPA-mozillateam' >> /etc/apt/preferences.d/mozilla-firefox && \
+    echo 'Pin-Priority: 1001' >> /etc/apt/preferences.d/mozilla-firefox
+
+RUN apt update -y && apt install -y \
     firefox \
-    dbus-x11 \
-    x11-utils \
-    x11-xserver-utils \
-    xterm \
-    ca-certificates && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    xubuntu-icon-theme \
+    obs-studio
 
-RUN add-apt-repository ppa:obsproject/obs-studio -y && \
-    apt-get update && \
-    apt-get install -y obs-studio && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-RUN mkdir -p /var/run/sshd
-
-RUN echo "root:lookmora" | chpasswd
-
-RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/g' /etc/ssh/sshd_config && \
-    echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
-
-RUN mkdir -p /root/.vnc
-
-RUN echo '#!/bin/bash' > /root/.vnc/xstartup && \
-    echo 'xrdb $HOME/.Xresources' >> /root/.vnc/xstartup && \
-    echo 'startxfce4 &' >> /root/.vnc/xstartup && \
-    chmod +x /root/.vnc/xstartup
+RUN apt clean && rm -rf /var/lib/apt/lists/*
 
 RUN touch /root/.Xauthority
 
-EXPOSE 22
 EXPOSE 5901
 EXPOSE 6080
 
-CMD bash -c '\
-service ssh start && \
-vncserver :1 -localhost no -SecurityTypes None -geometry 1280x720 && \
-websockify --web=/usr/share/novnc/ 6080 localhost:5901 & \
+CMD bash -c 'vncserver -localhost no -SecurityTypes None -geometry 1280x720 :1 && \
+openssl req -new -subj "/C=JP" -x509 -days 365 -nodes -out self.pem -keyout self.pem && \
+websockify -D --web=/usr/share/novnc/ --cert=self.pem 6080 localhost:5901 && \
 tail -f /dev/null'
